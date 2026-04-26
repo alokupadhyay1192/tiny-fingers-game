@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Tiny Fingers 🌌</title>
+
+  <style>
+    /* ============================================================
+       BASE / SHARED
+       ============================================================ */
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at center, #020617, #000);
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 🌌 Background stars */
+    .star-bg {
+      position: fixed;
+      border-radius: 50%;
+      opacity: 0.8;
+      animation: twinkle 2s infinite alternate, drift 20s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes drift {
+      from { transform: translateY(0px); }
+      to   { transform: translateY(-100vh); }
+    }
+    @keyframes twinkle {
+      from { opacity: 0.2; }
+      to   { opacity: 1; }
+    }
+
+    /* ============================================================
+       START SCREEN
+       ============================================================ */
+    #startScreen {
+      text-align: center;
+      z-index: 10;
+      padding: 24px;
+    }
+    #startScreen h1 {
+      font-size: clamp(28px, 6vw, 56px);
+      margin: 0 0 32px;
+      text-shadow: 0 0 30px rgba(96, 165, 250, .6);
+    }
+    .mode-buttons {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .mode-btn {
+      padding: 22px 28px;
+      font-size: clamp(16px, 2.2vw, 22px);
+      font-weight: 600;
+      border: none;
+      border-radius: 20px;
+      color: white;
+      cursor: pointer;
+      transition: transform .2s ease, box-shadow .2s ease;
+      min-width: 240px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    .mode-btn .emoji { font-size: 1.6em; display: block; margin-bottom: 8px; }
+    .mode-btn:hover { transform: translateY(-4px) scale(1.04); }
+    .mode-btn.keyboard { background: linear-gradient(45deg, #22c55e, #0ea5e9); }
+    .mode-btn.piano    { background: linear-gradient(45deg, #f472b6, #f59e0b); }
+
+    /* ============================================================
+       KEYBOARD-CONFETTI MODE
+       ============================================================ */
+    #app {
+      display: none;
+      text-align: center;
+      z-index: 10;
+    }
+    #key {
+      font-size: clamp(64px, 18vw, 160px);
+      font-weight: bold;
+      text-shadow: 0 0 20px rgba(255,255,255,0.8);
+      transition: transform 0.15s ease;
+    }
+    .press { transform: scale(1.2); }
+
+    /* ✨ Fancy cursor */
+    #cursor {
+      position: fixed;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, #4ade80, #22c55e);
+      box-shadow: 0 0 10px rgba(34,197,94,0.6);
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .cursor-active { transform: translate(-50%, -50%) scale(1.8); }
+
+    /* ✨ Sparkles */
+    .sparkle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9998;
+      animation: fadeOut 0.8s forwards;
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: scale(0); }
+    }
+    @keyframes floatUp {
+      0%   { transform: scale(0.5) translateY(0); opacity: 1; }
+      100% { transform: scale(1.2) translateY(-120px) rotate(20deg); opacity: 0; }
+    }
+
+    /* ============================================================
+       PIANO MODE
+       ============================================================ */
+    #pianoApp {
+      display: none;
+      width: 100%;
+      max-width: 1200px;
+      padding: 20px;
+      z-index: 10;
+    }
+
+    .piano-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      background: rgba(255,255,255,.06);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 12px 16px;
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    .piano-toolbar button,
+    .piano-toolbar label {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .piano-toolbar button:hover { background: rgba(255,255,255,.2); }
+    .piano-toolbar button:active { transform: scale(.95); }
+    .piano-toolbar button.active {
+      background: linear-gradient(45deg, #f472b6, #f59e0b);
+      border-color: transparent;
+    }
+    .piano-toolbar button.recording {
+      background: linear-gradient(45deg, #ef4444, #f97316);
+      border-color: transparent;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.6); }
+      50%      { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+    }
+    .piano-toolbar input[type="range"] {
+      width: 100px;
+      accent-color: #f472b6;
+    }
+    #octaveLabel {
+      font-size: 13px;
+      opacity: .8;
+      padding: 0 4px;
+    }
+
+    .piano-title {
+      text-align: center;
+      font-size: clamp(20px, 3vw, 28px);
+      margin: 0 0 16px;
+      text-shadow: 0 0 20px rgba(244, 114, 182, .5);
+    }
+
+    /* The piano itself */
+    .piano {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      margin: 0 auto;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      filter: drop-shadow(0 20px 30px rgba(0,0,0,.5));
+    }
+    .piano-inner {
+      position: relative;
+      display: flex;
+      background: linear-gradient(180deg, #1f2937, #0f172a);
+      padding: 14px 14px 18px;
+      border-radius: 14px;
+      border: 2px solid rgba(255,255,255,.08);
+    }
+
+    .key {
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 14px;
+      transition: transform .08s ease, box-shadow .08s ease, filter .08s ease;
+    }
+
+    .key.white {
+      width: 56px;
+      height: 220px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 70%, #e2e8f0 100%);
+      border-radius: 0 0 10px 10px;
+      box-shadow:
+        inset 0 -6px 0 rgba(0,0,0,.08),
+        0 4px 6px rgba(0,0,0,.25);
+      color: #334155;
+      margin: 0 1px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .key.black {
+      position: absolute;
+      top: 14px;
+      width: 36px;
+      height: 140px;
+      background: linear-gradient(180deg, #0f172a 0%, #1e293b 90%);
+      border-radius: 0 0 8px 8px;
+      box-shadow:
+        inset 0 -4px 0 rgba(255,255,255,.05),
+        0 6px 10px rgba(0,0,0,.5);
+      color: #f8fafc;
+      z-index: 2;
+      border: 1px solid #000;
+    }
+
+    .key .note-name {
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .key .key-binding {
+      font-size: 10px;
+      font-weight: 600;
+      opacity: .55;
+      margin-top: 2px;
+      pointer-events: none;
+      text-transform: uppercase;
+    }
+    .key .emoji {
+      position: absolute;
+      top: 14px;
+      font-size: 18px;
+      pointer-events: none;
+      opacity: .85;
+    }
+    .key.black .emoji { top: 8px; font-size: 14px; }
+
+    /* Pressed state */
+    .key.white.active {
+      transform: translateY(2px);
+      background: linear-gradient(180deg, #fef3c7, #fde68a);
+      box-shadow:
+        inset 0 -2px 0 rgba(0,0,0,.1),
+        0 0 28px rgba(251,191,36,.85),
+        0 2px 4px rgba(0,0,0,.25);
+    }
+    .key.black.active {
+      transform: translateY(2px);
+      background: linear-gradient(180deg, #ec4899, #be185d);
+      box-shadow:
+        inset 0 -2px 0 rgba(255,255,255,.15),
+        0 0 24px rgba(244,114,182,.9),
+        0 4px 8px rgba(0,0,0,.4);
+    }
+
+    /* Floating note bubbles */
+    #floatingNotes {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      overflow: hidden;
+    }
+    .floating-note {
+      position: absolute;
+      font-size: 32px;
+      font-weight: 700;
+      color: #fde68a;
+      text-shadow: 0 0 18px rgba(253, 224, 71, .8);
+      animation: floatNote 1.4s ease-out forwards;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    @keyframes floatNote {
+      0%   { transform: translate(-50%, 0) scale(.6); opacity: 0; }
+      20%  { transform: translate(-50%, -20px) scale(1.1); opacity: 1; }
+      100% { transform: translate(-50%, -180px) scale(1) rotate(8deg); opacity: 0; }
+    }
+
+    /* Kids Mode — bigger, brighter, fewer keys */
+    .piano.kids .key.white {
+      width: 84px;
+      height: 280px;
+      background: linear-gradient(180deg, #fff, #fde68a 80%, #fbbf24 100%);
+      border-radius: 0 0 18px 18px;
+      border-color: #fbbf24;
+    }
+    .piano.kids .key.black {
+      width: 56px;
+      height: 170px;
+      background: linear-gradient(180deg, #312e81, #4c1d95);
+      border-radius: 0 0 14px 14px;
+    }
+    .piano.kids .key .note-name { font-size: 18px; }
+    .piano.kids .key .emoji { font-size: 26px; }
+    .piano.kids .key .key-binding { display: none; }
+
+    /* Back button on top-left */
+    .back-fab {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
+    }
+    .back-fab:hover { background: rgba(255,255,255,.2); }
+
+    /* Mobile tweaks */
+    @media (max-width: 720px) {
+      .key.white { width: 42px; height: 180px; }
+      .key.black { width: 28px; height: 110px; }
+      .piano.kids .key.white { width: 64px; height: 220px; }
+      .piano.kids .key.black { width: 42px; height: 130px; }
+      .piano-toolbar { padding: 8px; gap: 6px; }
+      .piano-toolbar button, .piano-toolbar label { padding: 8px 10px; font-size: 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .piano-inner { padding: 8px; }
+      .key.white { width: 34px; height: 150px; }
+      .key.black { width: 22px; height: 92px; }
+      .key .note-name { font-size: 11px; }
+      .key .key-binding { display: none; }
+      .key .emoji { font-size: 14px; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- 🚀 START SCREEN -->
+<div id="startScreen">
+  <h1>🌌 Tiny Fingers 🌌</h1>
+  <div class="mode-buttons">
+    <button id="modeKeyboardBtn" class="mode-btn keyboard">
+      <span class="emoji">⌨️</span>
+      Keyboard Magic
+    </button>
+    <button id="modePianoBtn" class="mode-btn piano">
+      <span class="emoji">🎹</span>
+      Virtual Piano
+    </button>
+  </div>
+</div>
+
+<!-- ⌨️ KEYBOARD-CONFETTI MODE -->
+<div id="app">
+  <div id="key">⌨️</div>
+</div>
+
+<!-- 🎹 PIANO MODE -->
+<div id="pianoApp">
+  <h2 class="piano-title">🎹 Tiny Pianist <span style="opacity:.7">⭐ 🎵 🐻</span></h2>
+
+  <div class="piano-toolbar">
+    <button id="octaveDownBtn" title="Lower octave">⬇️ Octave</button>
+    <span id="octaveLabel">C4–B5</span>
+    <button id="octaveUpBtn" title="Higher octave">⬆️ Octave</button>
+    <button id="modeToggleBtn" title="Toggle fun sound mode">🎹 Piano</button>
+    <button id="kidsModeBtn" title="Toggle Kids Mode">🧸 Kids Mode</button>
+    <label>🔊 <input type="range" id="volumeSlider" min="0" max="100" value="65" /></label>
+    <button id="recordBtn">⏺ Record</button>
+    <button id="playRecBtn" disabled>▶️ Play</button>
+  </div>
+
+  <div class="piano">
+    <div class="piano-inner" id="piano"></div>
+  </div>
+</div>
+
+<!-- Floating notes overlay (used by piano mode) -->
+<div id="floatingNotes"></div>
+
+<!-- Universal back button (only shown inside a mode) -->
+<button id="backBtn" class="back-fab" style="display:none">← Back</button>
+
+<div id="cursor"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+/* =========================================================================
+   GLOBAL STATE
+   ========================================================================= */
+const startScreen   = document.getElementById("startScreen");
+const app           = document.getElementById("app");          // keyboard-confetti view
+const pianoApp      = document.getElementById("pianoApp");     // piano view
+const keyEl         = document.getElementById("key");
+const cursor        = document.getElementById("cursor");
+const backBtn       = document.getElementById("backBtn");
+const modeKeyboardBtn = document.getElementById("modeKeyboardBtn");
+const modePianoBtn    = document.getElementById("modePianoBtn");
+
+let currentMode = "start"; // 'start' | 'keyboard' | 'piano'
+
+/* =========================================================================
+   🌌 BACKGROUND STARS (shared)
+   ========================================================================= */
+(function createStars() {
+  const colors = ["#fff", "#0ff", "#f0f", "#ff0", "#4ade80", "#38bdf8"];
+  for (let i = 0; i < 120; i++) {
+    const star = document.createElement("div");
+    star.classList.add("star-bg");
+    star.style.left = Math.random() * window.innerWidth + "px";
+    star.style.top  = Math.random() * window.innerHeight + "px";
+    star.style.background = colors[Math.floor(Math.random() * colors.length)];
+    star.style.animationDuration = (Math.random() * 10 + 10) + "s";
+    const size = Math.random() * 3 + 2;
+    star.style.width = size + "px";
+    star.style.height = size + "px";
+    document.body.appendChild(star);
+  }
+})();
+
+/* =========================================================================
+   🖱 SHARED CURSOR EFFECT
+   ========================================================================= */
+let mouseX = 0, mouseY = 0, currentX = 0, currentY = 0;
+document.addEventListener("mousemove", (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  showCursor();
+  if (Math.random() > 0.3) createSparkle(e.clientX, e.clientY);
+});
+function animateCursor() {
+  currentX += (mouseX - currentX) * 0.2;
+  currentY += (mouseY - currentY) * 0.2;
+  cursor.style.left = currentX + "px";
+  cursor.style.top  = currentY + "px";
+  requestAnimationFrame(animateCursor);
+}
+animateCursor();
+
+let cursorTimeout;
+function showCursor() {
+  cursor.style.opacity = "1";
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => { cursor.style.opacity = "0"; }, 800);
+}
+function createSparkle(x, y) {
+  const el = document.createElement("div");
+  el.classList.add("sparkle");
+  const size = Math.random() * 4 + 2;
+  el.style.width = size + "px";
+  el.style.height = size + "px";
+  const colors = ["#0ff", "#f0f", "#ff0", "#4ade80", "#38bdf8"];
+  el.style.background = colors[Math.floor(Math.random() * colors.length)];
+  el.style.borderRadius = "50%";
+  el.style.left = (x + (Math.random() - 0.5) * 10) + "px";
+  el.style.top  = (y + (Math.random() - 0.5) * 10) + "px";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 500);
+}
+
+/* =========================================================================
+   🚪 MODE SWITCHER
+   ========================================================================= */
+function showMode(mode) {
+  currentMode = mode;
+  startScreen.style.display = mode === "start"    ? "block" : "none";
+  app.style.display         = mode === "keyboard" ? "block" : "none";
+  pianoApp.style.display    = mode === "piano"    ? "block" : "none";
+  backBtn.style.display     = mode === "start"    ? "none"  : "block";
+
+  if (mode === "keyboard") {
+    keyEl.textContent = "⌨️";
+  }
+  if (mode === "piano") {
+    Piano.ensureBuilt();
+    Piano.resumeAudio();
+  }
+}
+
+modeKeyboardBtn.addEventListener("click", () => {
+  enterFullscreen();
+  KeyboardConfetti.preloadLetterSounds();
+  showMode("keyboard");
+});
+modePianoBtn.addEventListener("click", () => {
+  enterFullscreen();
+  showMode("piano");
+});
+backBtn.addEventListener("click", () => {
+  exitFullscreen();
+  Piano.stopAll();
+  showMode("start");
+});
+
+function enterFullscreen() {
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+}
+function exitFullscreen() {
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+/* =========================================================================
+   ⌨️ KEYBOARD-CONFETTI MODE  (existing feature)
+   ========================================================================= */
+const KeyboardConfetti = (() => {
+  const funReactions = ["🦄","🐶","🐱","🐼","🐸","🌈","⭐","☁️","✨","🎈","🍭"];
+  const stickers     = ["🐶","🐱","🐼","🦄","🐸","🐥","⭐","🌈","☁️","✨","🍭","🎈"];
+  const fallbackAudio = new Audio("https://www.soundjay.com/buttons/button-16.mp3");
+
+  // Per-key TTS sounds (a-z, 0-9) generated with macOS `say` (kid-friendly Sandy voice)
+  const letterSounds = {};
+  let currentSound = null;
+
+  function preloadLetterSounds() {
+    if (Object.keys(letterSounds).length) return;
+    const keys = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
+    for (const k of keys) {
+      const a = new Audio(`sounds/${k}.m4a`);
+      a.preload = "auto";
+      letterSounds[k] = a;
+    }
+  }
+  function stopCurrentSound() {
+    if (currentSound) {
+      try { currentSound.pause(); currentSound.currentTime = 0; } catch (_) {}
+      currentSound = null;
+    }
+  }
+  function playKeySound(rawKey) {
+    stopCurrentSound();
+    const k = (rawKey || "").toLowerCase();
+    const sound = letterSounds[k] || fallbackAudio;
+    currentSound = sound;
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
+  }
+  function randomConfetti() {
+    confetti({
+      particleCount: 100,
+      spread: 120,
+      origin: { x: Math.random(), y: Math.random() * 0.5 }
+    });
+  }
+  function createSticker(x, y) {
+    const sticker = document.createElement("div");
+    sticker.textContent = stickers[Math.floor(Math.random() * stickers.length)];
+    sticker.style.position = "fixed";
+    sticker.style.left = x + "px";
+    sticker.style.top  = y + "px";
+    sticker.style.fontSize = (Math.random() * 30 + 30) + "px";
+    sticker.style.pointerEvents = "none";
+    sticker.style.zIndex = "9999";
+    sticker.style.animation = "floatUp 1.5s ease-out forwards";
+    document.body.appendChild(sticker);
+    setTimeout(() => sticker.remove(), 1500);
+  }
+  const isSpecialKey = (key) => key.length > 1;
+
+  function handleKeydown(event) {
+    if (event.code === "Space") {
+      for (let i = 0; i < 10; i++) {
+        createSticker(window.innerWidth / 2, window.innerHeight / 2);
+      }
+    }
+    if (isSpecialKey(event.key)) {
+      keyEl.textContent = funReactions[Math.floor(Math.random() * funReactions.length)];
+    } else {
+      keyEl.textContent = event.key.toUpperCase();
+    }
+    keyEl.classList.add("press");
+    setTimeout(() => keyEl.classList.remove("press"), 150);
+
+    playKeySound(event.key);
+    randomConfetti();
+
+    for (let i = 0; i < 3; i++) {
+      createSticker(Math.random() * window.innerWidth, Math.random() * window.innerHeight);
+    }
+    cursor.classList.add("cursor-active");
+    setTimeout(() => cursor.classList.remove("cursor-active"), 100);
+  }
+
+  return { preloadLetterSounds, handleKeydown };
+})();
+
+/* =========================================================================
+   🎹 PIANO MODE
+   Modular: AudioEngine + Piano (UI/controls) + Recorder
+   ========================================================================= */
+
+/* ---------- AudioEngine ----------------------------------------------- */
+const AudioEngine = (() => {
+  let ctx = null;
+  let master = null;
+  // Track currently playing notes per logical "voice key" so we can stop on release.
+  const activeVoices = new Map();
+
+  function ensure() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = 0.65;
+    master.connect(ctx.destination);
+  }
+  function resume() { ensure(); if (ctx.state === "suspended") ctx.resume(); }
+  function setVolume(v) { ensure(); master.gain.value = Math.max(0, Math.min(1, v)); }
+
+  // Soft, layered piano-ish sound (triangle + sine harmonic) with ADSR.
+  function playPiano(voiceId, freq) {
+    ensure();
+    stopVoice(voiceId, 0); // safety: stop any same-id voice
+
+    const t0 = ctx.currentTime;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const filt = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    osc1.type = "triangle";
+    osc1.frequency.value = freq;
+    osc2.type = "sine";
+    osc2.frequency.value = freq * 2; // octave overtone
+    filt.type = "lowpass";
+    filt.frequency.value = 3500;
+
+    const subGain = ctx.createGain();
+    subGain.gain.value = 0.35;
+    osc1.connect(gain);
+    osc2.connect(subGain).connect(gain);
+    gain.connect(filt).connect(master);
+
+    // ADSR
+    const peak = 0.5;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);  // attack
+    gain.gain.exponentialRampToValueAtTime(peak * 0.6, t0 + 0.25); // decay
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);  // release tail
+
+    osc1.start(t0); osc2.start(t0);
+    osc1.stop(t0 + 1.7); osc2.stop(t0 + 1.7);
+
+    activeVoices.set(voiceId, { gain, osc1, osc2, startedAt: t0 });
+  }
+
+  // Cartoon/animal-style fun sounds. We pick a flavor based on the noteIndex
+  // so each key gets a consistent fun sound while still being varied.
+  const FUN_FLAVORS = ["boing", "meow", "bark", "squeak", "whoosh", "pop", "moo", "duck"];
+
+  function playFun(voiceId, freq, noteIndex) {
+    ensure();
+    stopVoice(voiceId, 0);
+    const flavor = FUN_FLAVORS[noteIndex % FUN_FLAVORS.length];
+    const t0 = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.connect(master);
+
+    let oscs = [];
+    const baseFreq = freq;
+
+    switch (flavor) {
+      case "boing": {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(baseFreq * 1.6, t0);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, t0 + 0.35);
+        gain.gain.setValueAtTime(0.5, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+        o.connect(gain); o.start(t0); o.stop(t0 + 0.45);
+        oscs = [o];
+        break;
+      }
+      case "meow": {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(baseFreq * 0.9, t0);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 1.4, t0 + 0.12);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, t0 + 0.3);
+        const f = ctx.createBiquadFilter();
+        f.type = "lowpass"; f.frequency.value = 1200;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.4, t0 + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.42);
+        o.connect(f).connect(gain); o.start(t0); o.stop(t0 + 0.45);
+        oscs = [o];
+        break;
+      }
+      case "bark": {
+        const buf = createNoiseBuffer(0.18);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const f = ctx.createBiquadFilter();
+        f.type = "bandpass";
+        f.frequency.setValueAtTime(900, t0);
+        f.frequency.exponentialRampToValueAtTime(400, t0 + 0.15);
+        f.Q.value = 4;
+        gain.gain.setValueAtTime(0.6, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.18);
+        src.connect(f).connect(gain); src.start(t0); src.stop(t0 + 0.2);
+        oscs = [src];
+        break;
+      }
+      case "squeak": {
+        const o = ctx.createOscillator();
+        o.type = "square";
+        o.frequency.setValueAtTime(baseFreq * 2, t0);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 4, t0 + 0.15);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.2);
+        o.connect(gain); o.start(t0); o.stop(t0 + 0.22);
+        oscs = [o];
+        break;
+      }
+      case "whoosh": {
+        const buf = createNoiseBuffer(0.5);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const f = ctx.createBiquadFilter();
+        f.type = "bandpass";
+        f.frequency.setValueAtTime(400, t0);
+        f.frequency.exponentialRampToValueAtTime(2000, t0 + 0.4);
+        f.Q.value = 1.5;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.4, t0 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+        src.connect(f).connect(gain); src.start(t0); src.stop(t0 + 0.55);
+        oscs = [src];
+        break;
+      }
+      case "pop": {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(baseFreq * 0.5, t0);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 2.5, t0 + 0.04);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 0.6, t0 + 0.12);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.6, t0 + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+        o.connect(gain); o.start(t0); o.stop(t0 + 0.16);
+        oscs = [o];
+        break;
+      }
+      case "moo": {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(baseFreq * 0.45, t0);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 0.6, t0 + 0.4);
+        const f = ctx.createBiquadFilter();
+        f.type = "lowpass"; f.frequency.value = 700;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.45, t0 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55);
+        o.connect(f).connect(gain); o.start(t0); o.stop(t0 + 0.6);
+        oscs = [o];
+        break;
+      }
+      case "duck": {
+        const o = ctx.createOscillator();
+        o.type = "square";
+        o.frequency.setValueAtTime(baseFreq * 1.1, t0);
+        o.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, t0 + 0.2);
+        const f = ctx.createBiquadFilter();
+        f.type = "bandpass"; f.frequency.value = 1200; f.Q.value = 8;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.25);
+        o.connect(f).connect(gain); o.start(t0); o.stop(t0 + 0.28);
+        oscs = [o];
+        break;
+      }
+    }
+
+    activeVoices.set(voiceId, { gain, oscs, startedAt: t0, isFun: true });
+  }
+
+  function createNoiseBuffer(durationSec) {
+    const len = Math.floor(ctx.sampleRate * durationSec);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function stopVoice(voiceId, releaseSec = 0.15) {
+    const v = activeVoices.get(voiceId);
+    if (!v || !ctx) return;
+    const t = ctx.currentTime;
+    try {
+      v.gain.gain.cancelScheduledValues(t);
+      const now = Math.max(v.gain.gain.value, 0.0001);
+      v.gain.gain.setValueAtTime(now, t);
+      v.gain.gain.exponentialRampToValueAtTime(0.0001, t + releaseSec);
+    } catch (_) {}
+    activeVoices.delete(voiceId);
+  }
+
+  function stopAll() {
+    for (const id of Array.from(activeVoices.keys())) stopVoice(id, 0.05);
+  }
+
+  return { resume, setVolume, playPiano, playFun, stopVoice, stopAll };
+})();
+
+/* ---------- Piano UI / Controls -------------------------------------- */
+const Piano = (() => {
+  const pianoEl = document.getElementById("piano");
+  const pianoWrap = pianoEl.parentElement; // .piano
+  const octaveLabel = document.getElementById("octaveLabel");
+  const octaveDownBtn = document.getElementById("octaveDownBtn");
+  const octaveUpBtn = document.getElementById("octaveUpBtn");
+  const modeToggleBtn = document.getElementById("modeToggleBtn");
+  const kidsModeBtn = document.getElementById("kidsModeBtn");
+  const volumeSlider = document.getElementById("volumeSlider");
+  const recordBtn = document.getElementById("recordBtn");
+  const playRecBtn = document.getElementById("playRecBtn");
+  const floatingNotes = document.getElementById("floatingNotes");
+
+  // 12-tone notes within an octave
+  const NOTE_ORDER = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const SOLFEGE = { "C":"Do", "D":"Re", "E":"Mi", "F":"Fa", "G":"Sol", "A":"La", "B":"Ti" };
+  const KEY_EMOJIS = ["⭐","🎵","🐻","🌈","🦄","🐸","🍭","🎈","🐶","🐱","🐼","🌟"];
+
+  // Keyboard mapping (one octave): white keys ASDFGHJ, black keys WETYU.
+  // Maps a key -> offset within an octave (semitone count from C).
+  const WHITE_KEYBINDS = { "a":0,"s":2,"d":4,"f":5,"g":7,"h":9,"j":11 };
+  const BLACK_KEYBINDS = { "w":1,"e":3,"t":6,"y":8,"u":10 };
+
+  let baseOctave = 4;
+  let octaveCount = 2;
+  let kidsMode = false;
+  let funMode = false; // true = random fun sounds instead of piano
+  let built = false;
+
+  // Currently held notes (absolute semitone index from C0) -> voiceId
+  const heldNotes = new Map();
+
+  // Recording state
+  const recorder = (() => {
+    const MAX_MS = 30000;
+    let recording = false;
+    let startedAt = 0;
+    let events = [];     // {time, type:'down'|'up', semitone}
+    let timerId = null;
+    let playing = false;
+    let playTimers = [];
+
+    function start() {
+      if (playing) stopPlayback();
+      events = [];
+      startedAt = performance.now();
+      recording = true;
+      recordBtn.classList.add("recording");
+      recordBtn.textContent = "⏹ Stop";
+      playRecBtn.disabled = true;
+      timerId = setTimeout(stop, MAX_MS);
+    }
+    function stop() {
+      if (!recording) return;
+      recording = false;
+      clearTimeout(timerId);
+      recordBtn.classList.remove("recording");
+      recordBtn.textContent = "⏺ Record";
+      playRecBtn.disabled = events.length === 0;
+    }
+    function record(type, semitone) {
+      if (!recording) return;
+      events.push({ time: performance.now() - startedAt, type, semitone });
+    }
+    function play() {
+      if (recording) stop();
+      if (events.length === 0 || playing) return;
+      playing = true;
+      playRecBtn.textContent = "⏹ Stop";
+      const startWall = performance.now();
+      events.forEach(ev => {
+        const id = setTimeout(() => {
+          if (!playing) return;
+          if (ev.type === "down") pressSemitone(ev.semitone, /*fromUI*/ true);
+          else releaseSemitone(ev.semitone);
+        }, ev.time);
+        playTimers.push(id);
+      });
+      // Schedule playback finished
+      const last = events[events.length - 1].time + 800;
+      const endId = setTimeout(stopPlayback, last);
+      playTimers.push(endId);
+    }
+    function stopPlayback() {
+      playing = false;
+      playTimers.forEach(clearTimeout);
+      playTimers = [];
+      AudioEngine.stopAll();
+      // release any UI key states
+      pianoEl.querySelectorAll(".key.active").forEach(el => el.classList.remove("active"));
+      heldNotes.clear();
+      playRecBtn.textContent = "▶️ Play";
+    }
+    return { start, stop, record, play, stopPlayback,
+             get isRecording() { return recording; },
+             get isPlaying() { return playing; } };
+  })();
+
+  function freqFromSemitone(semi) {
+    // Reference: A4 = 440Hz at semitone (4*12 + 9) = 57 from C0
+    return 440 * Math.pow(2, (semi - 57) / 12);
+  }
+  function noteIndexFromSemitone(semi) { return ((semi % 12) + 12) % 12; }
+  function isBlackSemitone(semi) {
+    const n = noteIndexFromSemitone(semi);
+    return [1,3,6,8,10].includes(n);
+  }
+  function noteNameFromSemitone(semi) {
+    return NOTE_ORDER[noteIndexFromSemitone(semi)];
+  }
+  function octaveFromSemitone(semi) { return Math.floor(semi / 12); }
+
+  function ensureBuilt() {
+    if (!built) {
+      build();
+      built = true;
+      attachKeyboardEvents();
+    } else {
+      build(); // rebuild when octave/kids mode changed
+    }
+  }
+
+  function effectiveOctaveCount() { return kidsMode ? 1 : octaveCount; }
+
+  function build() {
+    pianoEl.innerHTML = "";
+    pianoWrap.classList.toggle("kids", kidsMode);
+
+    const totalOctaves = effectiveOctaveCount();
+    const startSemi = baseOctave * 12; // C of baseOctave
+    const totalSemis = totalOctaves * 12;
+
+    // First pass: render all white keys in order to compute their offsets
+    const whiteKeys = [];
+    for (let i = 0; i < totalSemis; i++) {
+      const semi = startSemi + i;
+      if (!isBlackSemitone(semi)) whiteKeys.push(semi);
+    }
+
+    // Render white keys (in flow)
+    whiteKeys.forEach((semi) => {
+      const el = makeKeyEl(semi, false);
+      pianoEl.appendChild(el);
+    });
+
+    // Render black keys (positioned absolutely over the row)
+    // We'll use the white-key DOM positions to align them.
+    requestAnimationFrame(() => {
+      const innerRect = pianoEl.getBoundingClientRect();
+      // Sort whites by left for stable lookup
+      const whiteEls = Array.from(pianoEl.querySelectorAll(".key.white"));
+      const whiteRects = whiteEls.map(e => e.getBoundingClientRect());
+
+      for (let i = 0; i < totalSemis; i++) {
+        const semi = startSemi + i;
+        if (!isBlackSemitone(semi)) continue;
+        // Find the white key immediately to the LEFT of this black key
+        // Black notes sit between two specific white notes:
+        //   C# between C and D, D# between D and E, F# between F and G, G# between G and A, A# between A and B
+        const noteIdx = noteIndexFromSemitone(semi);
+        const leftWhiteSemi = semi - 1; // whites are always 1 semitone below blacks (sharp form)
+        const leftIdx = whiteKeys.indexOf(leftWhiteSemi);
+        if (leftIdx === -1) continue;
+        const leftRect = whiteRects[leftIdx];
+        // Black key is centered on the boundary between leftWhite and leftWhite+1
+        const blackEl = makeKeyEl(semi, true);
+        pianoEl.appendChild(blackEl);
+        const bw = blackEl.offsetWidth || 36;
+        const center = (leftRect.right - innerRect.left);
+        blackEl.style.left = (center - bw / 2) + "px";
+      }
+    });
+
+    octaveLabel.textContent = `C${baseOctave}–B${baseOctave + totalOctaves - 1}`;
+  }
+
+  function makeKeyEl(semi, isBlack) {
+    const el = document.createElement("div");
+    el.classList.add("key", isBlack ? "black" : "white");
+    el.dataset.semi = String(semi);
+
+    // Show note name + (if applicable) keyboard binding for the BASE octave only.
+    const note = noteNameFromSemitone(semi);
+    const oct  = octaveFromSemitone(semi);
+    const inBaseOctave = oct === baseOctave;
+
+    const name = document.createElement("div");
+    name.className = "note-name";
+    name.textContent = note + (kidsMode ? "" : oct);
+    el.appendChild(name);
+
+    if (inBaseOctave) {
+      const offset = noteIndexFromSemitone(semi);
+      let bind = null;
+      if (!isBlack) {
+        bind = Object.entries(WHITE_KEYBINDS).find(([_, v]) => v === offset);
+      } else {
+        bind = Object.entries(BLACK_KEYBINDS).find(([_, v]) => v === offset);
+      }
+      if (bind) {
+        const b = document.createElement("div");
+        b.className = "key-binding";
+        b.textContent = bind[0];
+        el.appendChild(b);
+      }
+    }
+
+    // Cute emoji on white keys (deterministic by note name so it's stable)
+    if (!isBlack) {
+      const e = document.createElement("div");
+      e.className = "emoji";
+      e.textContent = KEY_EMOJIS[(semi * 7) % KEY_EMOJIS.length];
+      el.appendChild(e);
+    }
+
+    // Pointer events (mouse + touch)
+    el.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      el.setPointerCapture?.(ev.pointerId);
+      pressSemitone(semi, true);
+    });
+    el.addEventListener("pointerup", () => releaseSemitone(semi));
+    el.addEventListener("pointercancel", () => releaseSemitone(semi));
+    el.addEventListener("pointerleave", (ev) => {
+      // release only if pointer button is up OR pointer leaves while pressed -> still release
+      if (ev.buttons === 0) releaseSemitone(semi);
+    });
+
+    return el;
+  }
+
+  /* ---------- Note pressing ---------- */
+  function pressSemitone(semi, fromUI = false) {
+    if (heldNotes.has(semi)) return;
+    const voiceId = "v_" + semi;
+    heldNotes.set(semi, voiceId);
+    const freq = freqFromSemitone(semi);
+    const noteIdx = noteIndexFromSemitone(semi);
+    AudioEngine.resume();
+    if (funMode) AudioEngine.playFun(voiceId, freq, noteIdx);
+    else         AudioEngine.playPiano(voiceId, freq);
+
+    const el = pianoEl.querySelector(`.key[data-semi="${semi}"]`);
+    if (el) {
+      el.classList.add("active");
+      spawnFloatingNote(el, semi);
+    }
+    if (recorder.isRecording) recorder.record("down", semi);
+  }
+  function releaseSemitone(semi) {
+    const voiceId = heldNotes.get(semi);
+    if (!voiceId) return;
+    heldNotes.delete(semi);
+    AudioEngine.stopVoice(voiceId, 0.2);
+    const el = pianoEl.querySelector(`.key[data-semi="${semi}"]`);
+    if (el) el.classList.remove("active");
+    if (recorder.isRecording) recorder.record("up", semi);
+  }
+
+  function spawnFloatingNote(keyEl, semi) {
+    const r = keyEl.getBoundingClientRect();
+    const note = noteNameFromSemitone(semi);
+    const label = SOLFEGE[note] || note;
+    const f = document.createElement("div");
+    f.className = "floating-note";
+    f.textContent = label + " " + ["⭐","🎵","✨","🌈","🐻"][Math.floor(Math.random() * 5)];
+    f.style.left = (r.left + r.width / 2) + "px";
+    f.style.top  = r.top + "px";
+    floatingNotes.appendChild(f);
+    setTimeout(() => f.remove(), 1500);
+  }
+
+  /* ---------- Keyboard events (ASDFGHJ + WETYU) ---------- */
+  function keyToSemitone(key) {
+    const k = key.toLowerCase();
+    if (k in WHITE_KEYBINDS) return baseOctave * 12 + WHITE_KEYBINDS[k];
+    if (k in BLACK_KEYBINDS) return baseOctave * 12 + BLACK_KEYBINDS[k];
+    return null;
+  }
+
+  function attachKeyboardEvents() {
+    window.addEventListener("keydown", (ev) => {
+      if (currentMode !== "piano") return;
+      if (ev.repeat) return;
+      if (ev.key === "Escape") { backBtn.click(); return; }
+      if (ev.key === "ArrowUp")   { shiftOctave(+1); return; }
+      if (ev.key === "ArrowDown") { shiftOctave(-1); return; }
+      const semi = keyToSemitone(ev.key);
+      if (semi == null) return;
+      ev.preventDefault();
+      pressSemitone(semi);
+    });
+    window.addEventListener("keyup", (ev) => {
+      if (currentMode !== "piano") return;
+      const semi = keyToSemitone(ev.key);
+      if (semi == null) return;
+      releaseSemitone(semi);
+    });
+  }
+
+  /* ---------- Controls ---------- */
+  function shiftOctave(delta) {
+    const next = baseOctave + delta;
+    if (next < 1 || next + effectiveOctaveCount() - 1 > 7) return;
+    // Release any held notes before swapping
+    for (const semi of Array.from(heldNotes.keys())) releaseSemitone(semi);
+    baseOctave = next;
+    build();
+  }
+  octaveDownBtn.addEventListener("click", () => shiftOctave(-1));
+  octaveUpBtn.addEventListener("click",   () => shiftOctave(+1));
+
+  modeToggleBtn.addEventListener("click", () => {
+    funMode = !funMode;
+    modeToggleBtn.textContent = funMode ? "🎉 Fun Sounds" : "🎹 Piano";
+    modeToggleBtn.classList.toggle("active", funMode);
+  });
+
+  kidsModeBtn.addEventListener("click", () => {
+    kidsMode = !kidsMode;
+    kidsModeBtn.classList.toggle("active", kidsMode);
+    for (const semi of Array.from(heldNotes.keys())) releaseSemitone(semi);
+    build();
+  });
+
+  volumeSlider.addEventListener("input", (e) => {
+    AudioEngine.setVolume(parseInt(e.target.value, 10) / 100);
+  });
+
+  recordBtn.addEventListener("click", () => {
+    if (recorder.isRecording) recorder.stop();
+    else recorder.start();
+  });
+  playRecBtn.addEventListener("click", () => {
+    if (recorder.isPlaying) recorder.stopPlayback();
+    else recorder.play();
+  });
+
+  /* ---------- Public API ---------- */
+  return {
+    ensureBuilt,
+    resumeAudio: () => AudioEngine.resume(),
+    stopAll: () => {
+      AudioEngine.stopAll();
+      heldNotes.clear();
+      pianoEl.querySelectorAll(".key.active").forEach(el => el.classList.remove("active"));
+    },
+  };
+})();
+
+/* =========================================================================
+   GLOBAL KEYBOARD ROUTING (mode-aware)
+   ========================================================================= */
+window.addEventListener("keydown", (event) => {
+  if (currentMode === "keyboard") {
+    if (event.key === "Escape") { backBtn.click(); return; }
+    KeyboardConfetti.handleKeydown(event);
+  }
+  // piano keydown is handled by Piano's own listener (mode-gated there too)
+});
+
+/* Initial state */
+showMode("start");
+</script>
+
+</body>
+</html>
