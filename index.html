@@ -263,13 +263,15 @@
       pointer-events: none;
     }
     .key .key-binding {
-      font-size: 10px;
-      font-weight: 600;
-      opacity: .55;
-      margin-top: 2px;
+      font-size: 11px;
+      font-weight: 700;
+      opacity: .75;
+      margin-top: 3px;
       pointer-events: none;
       text-transform: uppercase;
+      letter-spacing: .04em;
     }
+    .key.black .key-binding { color: #fde68a; }
     .key .emoji {
       position: absolute;
       top: 14px;
@@ -335,9 +337,23 @@
       background: linear-gradient(180deg, #312e81, #4c1d95);
       border-radius: 0 0 14px 14px;
     }
-    .piano.kids .key .note-name { font-size: 18px; }
+    /* In Kids Mode the BIG label is the keyboard letter (so what you see
+       equals what you press). The musical note name is hidden. */
+    .piano.kids .key .note-name { display: none; }
     .piano.kids .key .emoji { font-size: 26px; }
-    .piano.kids .key .key-binding { display: none; }
+    .piano.kids .key .key-binding {
+      display: block;
+      font-size: 28px;
+      font-weight: 800;
+      opacity: .95;
+      margin-top: 0;
+      color: #831843;
+      letter-spacing: 0;
+    }
+    .piano.kids .key.black .key-binding {
+      font-size: 20px;
+      color: #fde68a;
+    }
 
     /* Back button on top-left */
     .back-fab {
@@ -363,11 +379,27 @@
       .key.black { width: 28px; height: 110px; }
       .piano.kids .key.white { width: 64px; height: 220px; }
       .piano.kids .key.black { width: 42px; height: 130px; }
-      .piano-toolbar { padding: 8px; gap: 6px; }
-      .piano-toolbar button, .piano-toolbar label { padding: 8px 10px; font-size: 12px; }
+      .piano-toolbar {
+        padding: 8px;
+        gap: 6px;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+      }
+      .piano-toolbar button, .piano-toolbar label {
+        padding: 8px 10px;
+        font-size: 12px;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
       .piano-toolbar input[type="range"] { width: 70px; }
       #pianoApp { padding: 12px; }
       .back-fab { padding: 8px 10px; font-size: 12px; top: 10px; left: 10px; }
+      .piano.kids .key .key-binding { font-size: 22px; }
+      .piano.kids .key.black .key-binding { font-size: 16px; }
     }
 
     @media (max-width: 480px) {
@@ -994,10 +1026,27 @@ const Piano = (() => {
   const SOLFEGE = { "C":"Do", "D":"Re", "E":"Mi", "F":"Fa", "G":"Sol", "A":"La", "B":"Ti" };
   const KEY_EMOJIS = ["⭐","🎵","🐻","🌈","🦄","🐸","🍭","🎈","🐶","🐱","🐼","🌟"];
 
-  // Keyboard mapping (one octave): white keys ASDFGHJ, black keys WETYU.
-  // Maps a key -> offset within an octave (semitone count from C).
-  const WHITE_KEYBINDS = { "a":0,"s":2,"d":4,"f":5,"g":7,"h":9,"j":11 };
-  const BLACK_KEYBINDS = { "w":1,"e":3,"t":6,"y":8,"u":10 };
+  // ---------- Keyboard mappings -------------------------------------------
+  // Each map keys a keyboard char -> offset (in semitones from that octave's C)
+  //
+  // KIDS MODE (1 octave only): the classic ASDFGHJ + WETYU "home row" layout.
+  //   This is also the layout we *display* on the kids-mode keys, so the letter
+  //   on the key always matches the key you press.
+  const KIDS_WHITE_KEYBINDS  = { "a":0,"s":2,"d":4,"f":5,"g":7,"h":9,"j":11 };
+  const KIDS_BLACK_KEYBINDS  = { "w":1,"e":3,"t":6,"y":8,"u":10 };
+  //
+  // NORMAL MODE (2 octaves): two non-overlapping rows so the *whole* piano —
+  // including the right half — is reachable from the laptop keyboard.
+  //   Lower octave  whites: Z X C V B N M    blacks: S D _ G H J
+  //   Upper octave  whites: Q W E R T Y U    blacks: 2 3 _ 5 6 7
+  const WHITE_KEYBINDS_PER_OCT = [
+    { "z":0,"x":2,"c":4,"v":5,"b":7,"n":9,"m":11 },   // lower octave
+    { "q":0,"w":2,"e":4,"r":5,"t":7,"y":9,"u":11 },   // upper octave
+  ];
+  const BLACK_KEYBINDS_PER_OCT = [
+    { "s":1,"d":3,"g":6,"h":8,"j":10 },                // lower octave
+    { "2":1,"3":3,"5":6,"6":8,"7":10 },                // upper octave
+  ];
 
   let baseOctave = 4;
   let octaveCount = 2;
@@ -1157,30 +1206,35 @@ const Piano = (() => {
     el.classList.add("key", isBlack ? "black" : "white");
     el.dataset.semi = String(semi);
 
-    // Show note name + (if applicable) keyboard binding for the BASE octave only.
-    const note = noteNameFromSemitone(semi);
-    const oct  = octaveFromSemitone(semi);
-    const inBaseOctave = oct === baseOctave;
+    const note   = noteNameFromSemitone(semi);
+    const oct    = octaveFromSemitone(semi);
+    const octIdx = oct - baseOctave; // 0 = lower octave, 1 = upper octave
+    const offset = noteIndexFromSemitone(semi);
 
     const name = document.createElement("div");
     name.className = "note-name";
     name.textContent = note + (kidsMode ? "" : oct);
     el.appendChild(name);
 
-    if (inBaseOctave) {
-      const offset = noteIndexFromSemitone(semi);
-      let bind = null;
-      if (!isBlack) {
-        bind = Object.entries(WHITE_KEYBINDS).find(([_, v]) => v === offset);
-      } else {
-        bind = Object.entries(BLACK_KEYBINDS).find(([_, v]) => v === offset);
+    // Resolve the keyboard letter that triggers this key, depending on mode/octave.
+    let bindLetter = null;
+    if (kidsMode) {
+      const map = isBlack ? KIDS_BLACK_KEYBINDS : KIDS_WHITE_KEYBINDS;
+      const found = Object.entries(map).find(([_, v]) => v === offset);
+      if (found) bindLetter = found[0];
+    } else {
+      const maps = isBlack ? BLACK_KEYBINDS_PER_OCT : WHITE_KEYBINDS_PER_OCT;
+      const map = maps[octIdx];
+      if (map) {
+        const found = Object.entries(map).find(([_, v]) => v === offset);
+        if (found) bindLetter = found[0];
       }
-      if (bind) {
-        const b = document.createElement("div");
-        b.className = "key-binding";
-        b.textContent = bind[0];
-        el.appendChild(b);
-      }
+    }
+    if (bindLetter) {
+      const b = document.createElement("div");
+      b.className = "key-binding";
+      b.textContent = bindLetter;
+      el.appendChild(b);
     }
 
     // Cute emoji on white keys (deterministic by note name so it's stable)
@@ -1248,11 +1302,25 @@ const Piano = (() => {
     setTimeout(() => f.remove(), 1500);
   }
 
-  /* ---------- Keyboard events (ASDFGHJ + WETYU) ---------- */
+  /* ---------- Keyboard events ----------
+     Kids mode  (1 octave): ASDFGHJ + WETYU
+     Normal mode (2 octaves):
+       Lower octave  ZXCVBNM (whites)  +  S D G H J (blacks)
+       Upper octave  QWERTYU (whites)  +  2 3 5 6 7 (blacks) */
   function keyToSemitone(key) {
     const k = key.toLowerCase();
-    if (k in WHITE_KEYBINDS) return baseOctave * 12 + WHITE_KEYBINDS[k];
-    if (k in BLACK_KEYBINDS) return baseOctave * 12 + BLACK_KEYBINDS[k];
+    if (kidsMode) {
+      if (k in KIDS_WHITE_KEYBINDS) return baseOctave * 12 + KIDS_WHITE_KEYBINDS[k];
+      if (k in KIDS_BLACK_KEYBINDS) return baseOctave * 12 + KIDS_BLACK_KEYBINDS[k];
+      return null;
+    }
+    const total = effectiveOctaveCount();
+    for (let octIdx = 0; octIdx < total; octIdx++) {
+      const wmap = WHITE_KEYBINDS_PER_OCT[octIdx];
+      const bmap = BLACK_KEYBINDS_PER_OCT[octIdx];
+      if (wmap && k in wmap) return (baseOctave + octIdx) * 12 + wmap[k];
+      if (bmap && k in bmap) return (baseOctave + octIdx) * 12 + bmap[k];
+    }
     return null;
   }
 
