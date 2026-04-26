@@ -365,6 +365,9 @@
       .piano.kids .key.black { width: 42px; height: 130px; }
       .piano-toolbar { padding: 8px; gap: 6px; }
       .piano-toolbar button, .piano-toolbar label { padding: 8px 10px; font-size: 12px; }
+      .piano-toolbar input[type="range"] { width: 70px; }
+      #pianoApp { padding: 12px; }
+      .back-fab { padding: 8px 10px; font-size: 12px; top: 10px; left: 10px; }
     }
 
     @media (max-width: 480px) {
@@ -374,6 +377,91 @@
       .key .note-name { font-size: 11px; }
       .key .key-binding { display: none; }
       .key .emoji { font-size: 14px; }
+      .piano.kids .key.white { width: 50px; height: 180px; }
+      .piano.kids .key.black { width: 32px; height: 110px; }
+      .piano-toolbar { gap: 4px; padding: 6px; margin-bottom: 12px; }
+      .piano-toolbar button, .piano-toolbar label { padding: 6px 8px; font-size: 11px; }
+      .piano-toolbar input[type="range"] { width: 56px; }
+      .piano-title { margin-bottom: 8px; }
+    }
+
+    /* Landscape phones: super-compact so all buttons + the piano always fit */
+    @media (max-height: 480px) and (orientation: landscape) {
+      #pianoApp { padding: 6px 10px; }
+      .piano-title { font-size: 16px; margin: 0 0 6px; }
+      .piano-toolbar {
+        margin-bottom: 8px;
+        padding: 4px 6px;
+        gap: 4px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        max-width: 100%;
+        -webkit-overflow-scrolling: touch;
+      }
+      .piano-toolbar button, .piano-toolbar label {
+        padding: 5px 8px;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .piano-toolbar input[type="range"] { width: 60px; }
+      .key.white { height: 150px; }
+      .key.black { height: 92px; }
+      .piano.kids .key.white { height: 170px; }
+      .piano.kids .key.black { height: 100px; }
+      .back-fab { top: 6px; left: 6px; padding: 6px 8px; font-size: 11px; }
+    }
+
+    /* ============================================================
+       PHONE-ONLY RULES
+       (Phones generally don't have a keyboard, so the
+        "Keyboard Magic" mode is hidden on touch-only small devices.
+        We also force landscape inside a mode so all controls fit.)
+       ============================================================ */
+    @media (max-width: 900px) and (hover: none) and (pointer: coarse) {
+      .mode-btn.keyboard { display: none; }
+    }
+
+    /* Rotate-your-device overlay (phones in portrait while inside a mode) */
+    #rotatePrompt {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #020617, #000);
+      color: white;
+      z-index: 10001;
+      text-align: center;
+      padding: 24px;
+    }
+    #rotatePrompt .rotate-icon {
+      font-size: 84px;
+      display: inline-block;
+      animation: rotateHint 1.8s ease-in-out infinite;
+      margin-bottom: 18px;
+      filter: drop-shadow(0 0 18px rgba(96, 165, 250, .6));
+    }
+    @keyframes rotateHint {
+      0%, 20%   { transform: rotate(0deg); }
+      60%, 100% { transform: rotate(90deg); }
+    }
+    #rotatePrompt h2 {
+      font-size: 22px;
+      margin: 0 0 8px;
+      text-shadow: 0 0 18px rgba(244, 114, 182, .55);
+    }
+    #rotatePrompt p {
+      font-size: 14px;
+      opacity: .85;
+      margin: 0;
+      max-width: 280px;
+    }
+    @media (max-width: 900px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
+      body.in-mode #rotatePrompt { display: flex; }
+      body.in-mode #app,
+      body.in-mode #pianoApp,
+      body.in-mode #backBtn { visibility: hidden; }
     }
   </style>
 </head>
@@ -425,6 +513,13 @@
 
 <!-- Universal back button (only shown inside a mode) -->
 <button id="backBtn" class="back-fab" style="display:none">← Back</button>
+
+<!-- Rotate-your-device overlay (phones in portrait while inside a mode) -->
+<div id="rotatePrompt" aria-hidden="true">
+  <div class="rotate-icon">📱</div>
+  <h2>Please rotate your device</h2>
+  <p>Tiny Fingers fits best in landscape on phones — turn your device sideways to play!</p>
+</div>
 
 <div id="cursor"></div>
 
@@ -514,14 +609,29 @@ function showMode(mode) {
   pianoApp.style.display    = mode === "piano"    ? "block" : "none";
   backBtn.style.display     = mode === "start"    ? "none"  : "block";
 
+  // Toggle body flag so the phone "rotate-to-landscape" overlay only shows in a mode.
+  document.body.classList.toggle("in-mode", mode !== "start");
+
   if (mode === "keyboard") {
     keyEl.textContent = "⌨️";
   }
   if (mode === "piano") {
     Piano.ensureBuilt();
     Piano.resumeAudio();
+    // Re-measure black-key positions after layout settles (esp. after rotation).
+    requestAnimationFrame(() => Piano.ensureBuilt());
   }
 }
+
+// Re-layout the piano when the phone is rotated so black keys stay aligned.
+window.addEventListener("orientationchange", () => {
+  if (currentMode === "piano") {
+    setTimeout(() => Piano.ensureBuilt(), 150);
+  }
+});
+window.addEventListener("resize", () => {
+  if (currentMode === "piano") Piano.ensureBuilt();
+});
 
 modeKeyboardBtn.addEventListener("click", () => {
   enterFullscreen();
@@ -538,12 +648,26 @@ backBtn.addEventListener("click", () => {
   showMode("start");
 });
 
-function enterFullscreen() {
-  if (document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
+async function enterFullscreen() {
+  try {
+    if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch (_) {}
+  // Best-effort: lock to landscape on phones (works on Android Chrome,
+  // not supported by iOS Safari — there we fall back to the rotate overlay).
+  try {
+    if (screen.orientation && typeof screen.orientation.lock === "function") {
+      await screen.orientation.lock("landscape").catch(() => {});
+    }
+  } catch (_) {}
 }
 function exitFullscreen() {
+  try {
+    if (screen.orientation && typeof screen.orientation.unlock === "function") {
+      screen.orientation.unlock();
+    }
+  } catch (_) {}
   if (document.fullscreenElement && document.exitFullscreen) {
     document.exitFullscreen().catch(() => {});
   }
